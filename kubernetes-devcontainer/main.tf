@@ -464,3 +464,55 @@ resource "coder_metadata" "container_info" {
     value = var.cache_repo == "" ? "not enabled" : var.cache_repo
   }
 }
+
+
+resource "coder_agent" "coder" {
+  os             = "linux"
+  arch           = "amd64"
+  dir            = "/home/coder"
+  startup_script = <<-EOF
+    # Install marimo with recommended dependencies
+    pip3 install "marimo[recommended]"
+    
+    # Start marimo server
+    $HOME/.local/bin/marimo edit --host=0.0.0.0 --port=8888
+  EOF
+}
+
+resource "coder_app" "marimo" {
+  agent_id     = coder_agent.coder.id
+  slug         = "marimo"
+  display_name = "Marimo"
+  url          = "http://localhost:8888"
+  icon         = "/icon/go.svg"  # You can replace with a Marimo icon if available
+  share        = "owner"
+  subdomain    = true
+  healthcheck {
+    url       = "http://localhost:8888/healthz"
+    interval  = 5
+    threshold = 10
+  }
+}
+
+module "filebrowser" {
+  count    = data.coder_workspace.me.start_count
+  source   = "registry.coder.com/modules/filebrowser/coder"
+  version  = "1.0.31"
+  agent_id = coder_agent.example.id
+}
+
+
+resource "coder_app" "argo_workflows" {
+  agent_id  = coder_agent.main.id
+  slug      = "argo-workflows"
+  icon      = "/icon/dotnet.svg"
+  url       = "http://10.100.127.31:32746"  
+  subdomain = true
+  share     = "authenticated"
+
+  healthcheck {
+    url       = "http://10.100.127.31:32746"
+    interval  = 10
+    threshold = 20
+  }
+}
